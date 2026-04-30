@@ -1,16 +1,14 @@
 resource "aws_cognito_user_pool" "main" {
   name = "${local.name}-users"
 
-  username_attributes      = ["email"]
-  auto_verified_attributes = ["email"]
-  mfa_configuration        = "OFF"
+  username_attributes = ["email"]
+  mfa_configuration   = "OFF"
 
-  password_policy {
-    minimum_length    = 12
-    require_lowercase = true
-    require_uppercase = true
-    require_numbers   = true
-    require_symbols   = false
+  # SAML-only: no self sign-up. Federated users are still auto-created
+  # behind the scenes when they sign in via SAML; this only blocks the
+  # native sign-up form.
+  admin_create_user_config {
+    allow_admin_create_user_only = true
   }
 
   schema {
@@ -54,10 +52,10 @@ resource "aws_cognito_user_pool_client" "web" {
   allowed_oauth_flows                  = ["code"]
   allowed_oauth_scopes                 = ["openid", "email", "profile"]
 
-  supported_identity_providers = concat(
-    ["COGNITO"],
-    var.saml_metadata_url == "" ? [] : ["AWSIdentityCenter"]
-  )
+  # SAML-only when the IdP is configured. Falls back to COGNITO only if no
+  # SAML metadata is set (so initial bootstrap still applies); production
+  # use requires saml_metadata_url to be set.
+  supported_identity_providers = var.saml_metadata_url == "" ? ["COGNITO"] : ["AWSIdentityCenter"]
 
   # Auto-include the CloudFront origin so we don't need a second apply.
   callback_urls = concat(

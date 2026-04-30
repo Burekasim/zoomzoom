@@ -43,6 +43,8 @@ export const login = async () => {
   u.searchParams.set("redirect_uri", config.redirectUri);
   u.searchParams.set("code_challenge_method", "S256");
   u.searchParams.set("code_challenge", challenge);
+  // Skip Cognito's provider-chooser screen and go straight to Identity Center.
+  u.searchParams.set("identity_provider", "AWSIdentityCenter");
   window.location.href = u.toString();
 };
 
