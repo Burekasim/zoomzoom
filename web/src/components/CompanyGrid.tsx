@@ -9,6 +9,18 @@ const colorFor = (id: string) => {
   return Math.abs(h) % PALETTE_SIZE;
 };
 
+const ORDER_KEY = "zz_card_order";
+const loadOrder = (): string[] => {
+  try {
+    return JSON.parse(localStorage.getItem(ORDER_KEY) || "[]");
+  } catch {
+    return [];
+  }
+};
+const saveOrder = (ids: string[]) => {
+  localStorage.setItem(ORDER_KEY, JSON.stringify(ids));
+};
+
 export const CompanyGrid = ({
   refreshKey,
   onChanged,
@@ -26,10 +38,22 @@ export const CompanyGrid = ({
     (async () => {
       setLoading(true);
       const cs = await api.listCompanies();
-      setCompanies(cs);
+      // Apply user-saved order from localStorage; unknown companies fall to end.
+      const order = loadOrder();
+      const ranked = cs
+        .map((c) => ({ c, idx: order.indexOf(c.id) }))
+        .sort((a, b) => {
+          if (a.idx === -1 && b.idx === -1)
+            return a.c.createdAt.localeCompare(b.c.createdAt);
+          if (a.idx === -1) return 1;
+          if (b.idx === -1) return -1;
+          return a.idx - b.idx;
+        })
+        .map((x) => x.c);
+      setCompanies(ranked);
       const [contactPairs, tasks] = await Promise.all([
         Promise.all(
-          cs.map((c) =>
+          ranked.map((c) =>
             api.listContacts(c.id).then((list) => [c.id, list] as const)
           )
         ),
@@ -55,6 +79,20 @@ export const CompanyGrid = ({
     })();
   }, [refreshKey]);
 
+  const moveCard = (sourceId: string, targetId: string) => {
+    if (!sourceId || sourceId === targetId) return;
+    setCompanies((prev) => {
+      const next = [...prev];
+      const fromIdx = next.findIndex((c) => c.id === sourceId);
+      const toIdx = next.findIndex((c) => c.id === targetId);
+      if (fromIdx < 0 || toIdx < 0) return prev;
+      const [moved] = next.splice(fromIdx, 1);
+      next.splice(toIdx, 0, moved);
+      saveOrder(next.map((c) => c.id));
+      return next;
+    });
+  };
+
   const addCompany = async () => {
     if (!newCo.trim()) return;
     await api.createCompany(newCo.trim());
@@ -73,6 +111,7 @@ export const CompanyGrid = ({
             contacts={contactsByCo[c.id] ?? []}
             tasks={tasksByCo[c.id] ?? []}
             onChanged={onChanged}
+            onMove={moveCard}
           />
         ))}
         <div className="company-add-card">

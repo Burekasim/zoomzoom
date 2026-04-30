@@ -30,15 +30,18 @@ const req = async <T>(
 };
 
 export type Company = { id: string; name: string; createdAt: string };
+export type ContactSide = "customer" | "aws";
 export type Contact = {
   id: string;
   companyId: string;
   name: string;
   email?: string;
   phone?: string;
+  side: ContactSide;
   lastContactedAt?: string;
   createdAt: string;
 };
+export type TaskOwner = "avi" | "nir" | "tomer" | "";
 export type Task = {
   id: string;
   title: string;
@@ -47,6 +50,13 @@ export type Task = {
   status: "open" | "done";
   companyId?: string;
   contactIds: string[];
+  owner?: string;
+  createdAt: string;
+};
+export type TaskUpdate = {
+  id: string;
+  text: string;
+  author: string;
   createdAt: string;
 };
 export type Note = {
@@ -76,8 +86,12 @@ export const api = {
 
   listContacts: (companyId: string) =>
     req<Contact[]>("GET", `/companies/${companyId}/contacts`),
-  createContact: (companyId: string, c: Omit<Contact, "id" | "companyId" | "createdAt">) =>
-    req<Contact>("POST", `/companies/${companyId}/contacts`, c),
+  createContact: (
+    companyId: string,
+    c: Omit<Contact, "id" | "companyId" | "createdAt" | "side"> & {
+      side?: ContactSide;
+    }
+  ) => req<Contact>("POST", `/companies/${companyId}/contacts`, c),
   deleteContact: (id: string) => req<void>("DELETE", `/contacts/${id}`),
   markContacted: (id: string) =>
     req<{ id: string; lastContactedAt: string }>(
@@ -92,10 +106,15 @@ export const api = {
     dueDate?: string;
     companyId?: string;
     contactIds?: string[];
+    owner?: string;
   }) => req<Task>("POST", "/tasks", t),
   updateTask: (id: string, patch: Partial<Task>) =>
     req<Task>("PATCH", `/tasks/${id}`, patch),
   deleteTask: (id: string) => req<void>("DELETE", `/tasks/${id}`),
+  listTaskUpdates: (id: string) =>
+    req<TaskUpdate[]>("GET", `/tasks/${id}/updates`),
+  addTaskUpdate: (id: string, text: string) =>
+    req<TaskUpdate>("POST", `/tasks/${id}/updates`, { text }),
 
   listNotes: (parent: string) =>
     req<Note[]>("GET", `/notes?parent=${encodeURIComponent(parent)}`),

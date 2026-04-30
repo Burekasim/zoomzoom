@@ -205,10 +205,12 @@ header h1 {
    ================================================================ */
 main { padding: 16px; flex: 1; }
 
+/* Flex-wrap so each card can have an independent width (resizable). */
 .company-grid {
-  display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(360px, 1fr));
+  display: flex;
+  flex-wrap: wrap;
   gap: 16px;
+  align-items: flex-start;
 }
 
 .company-card {
@@ -216,14 +218,26 @@ main { padding: 16px; flex: 1; }
   border: 1px solid var(--border);
   border-radius: 10px;
   box-shadow: var(--shadow-sm);
-  overflow: hidden;
+  overflow: auto;
   display: flex; flex-direction: column;
-  transition: box-shadow 150ms, transform 150ms;
+  transition: box-shadow 150ms, border-color 150ms;
+
+  /* User-resizable: drag the bottom-right corner. The size is persisted
+     in localStorage by CompanyCard via a ResizeObserver. */
+  resize: both;
+  width: 380px;
+  max-width: 100%;
+  min-width: 300px;
+  min-height: 200px;
 
   /* The card's accent colour. CompanyGrid hashes id → color-N class. */
   --card-color: var(--c0);
 }
 .company-card:hover { box-shadow: var(--shadow); }
+.company-card.drag-over {
+  border-color: var(--card-color);
+  box-shadow: 0 0 0 2px var(--card-color);
+}
 
 .company-card.color-0 { --card-color: var(--c0); }
 .company-card.color-1 { --card-color: var(--c1); }
@@ -243,6 +257,14 @@ main { padding: 16px; flex: 1; }
       color-mix(in srgb, var(--card-color) 14%, transparent),
       transparent 60%);
   border-left: 4px solid var(--card-color);
+  cursor: move;        /* the header is the drag handle */
+  user-select: none;
+}
+.card-header .drag-grip {
+  color: var(--fg-subtle);
+  font-size: 14px;
+  letter-spacing: -2px;
+  line-height: 1;
 }
 .card-header h3 {
   flex: 1; min-width: 0;
@@ -341,6 +363,26 @@ main { padding: 16px; flex: 1; }
 .add-row { display: flex; }
 .add-row input { flex: 1; font-size: 13px; }
 
+/* AWS section variant — slight tint to distinguish from customer side */
+.aws-section { background: rgba(255, 153, 0, 0.04); }
+.aws-section h4 .aws-badge {
+  display: inline-block;
+  padding: 1px 5px;
+  margin-right: 6px;
+  border-radius: 3px;
+  background: #ff9900;          /* AWS orange, both themes */
+  color: #fff;
+  font-size: 9px;
+  font-weight: 700;
+  letter-spacing: 0.05em;
+}
+
+/* The add-contact section combines an input + side-pick buttons */
+.add-contact .side-buttons {
+  display: flex; gap: 6px; margin-top: 6px;
+}
+.add-contact .side-buttons button { flex: 1; }
+
 /* ── Tasks ────────────────────────────────────────────────────── */
 .tasks-section { background:
   linear-gradient(to bottom,
@@ -350,22 +392,35 @@ main { padding: 16px; flex: 1; }
 .tasks-list { display: flex; flex-direction: column; gap: 2px; }
 
 .task-row {
-  display: grid;
-  grid-template-columns: 18px minmax(0, 1fr) auto auto auto;
-  align-items: center; gap: 8px;
-  padding: 5px 8px;
+  display: flex; flex-direction: column;
   border-radius: 6px;
+  border-left: 3px solid var(--card-color);
   transition: background 100ms;
   font-size: 13px;
-  border-left: 3px solid var(--card-color);
 }
 .task-row:hover { background: var(--panel-2); }
 .task-row.done .task-title { text-decoration: line-through; color: var(--fg-subtle); }
 .task-row.done { opacity: 0.65; }
 
+.task-summary {
+  display: grid;
+  grid-template-columns: 18px minmax(0, 1fr) auto auto auto auto;
+  align-items: center; gap: 8px;
+  padding: 5px 8px;
+  cursor: pointer;
+}
+
 .task-row .task-title {
   overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
   font-weight: 500;
+}
+
+.task-owner {
+  font-size: 10px; font-weight: 700; text-transform: uppercase;
+  letter-spacing: 0.05em;
+  padding: 2px 7px; border-radius: 999px;
+  background: var(--accent-bg); color: var(--accent);
+  white-space: nowrap;
 }
 
 .task-prio {
@@ -392,6 +447,76 @@ main { padding: 16px; flex: 1; }
 .task-del:hover { background: rgba(248, 113, 113, 0.16); color: var(--red); }
 
 .empty-row { color: var(--fg-subtle); font-size: 12px; padding: 6px 8px; font-style: italic; }
+
+/* ── Task expanded details ────────────────────────────────────── */
+.task-details {
+  border-top: 1px dashed var(--border);
+  padding: 10px 12px 12px 26px;
+  background: var(--panel);
+  display: flex; flex-direction: column; gap: 12px;
+}
+.task-details dl {
+  display: grid;
+  grid-template-columns: 80px 1fr;
+  gap: 4px 12px;
+  margin: 0;
+  font-size: 12px;
+}
+.task-details dt {
+  color: var(--fg-subtle);
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  font-weight: 600;
+  font-size: 10px;
+  align-self: center;
+}
+.task-details dd { margin: 0; }
+.task-details dd select { padding: 4px 8px; font-size: 12px; }
+
+.task-contact-chips {
+  display: flex; flex-wrap: wrap; gap: 4px;
+}
+.task-contact-chips li {
+  display: inline-flex; align-items: center; gap: 4px;
+  padding: 3px 8px;
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  font-size: 11px;
+  background: var(--panel-2);
+}
+.task-contact-chips li.aws { border-color: #ff9900; }
+.chip-tag {
+  font-size: 9px; font-weight: 700;
+  padding: 0 4px; border-radius: 2px;
+  background: #ff9900; color: #fff;
+}
+
+.task-updates h5 {
+  margin: 0;
+  font-size: 11px;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: var(--fg-subtle);
+  font-weight: 600;
+}
+.add-update {
+  display: flex; gap: 6px;
+  margin-top: 6px;
+}
+.add-update textarea { flex: 1; height: 50px; resize: vertical; font-size: 13px; }
+.updates-list {
+  display: flex; flex-direction: column; gap: 6px;
+  margin-top: 8px;
+}
+.updates-list li {
+  background: var(--panel-2);
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  padding: 6px 10px;
+  font-size: 12px;
+}
+.update-meta { color: var(--fg-subtle); font-size: 10px; margin-bottom: 2px; }
+.update-text { white-space: pre-wrap; }
 
 .add-task-btn {
   align-self: flex-start;

@@ -36,6 +36,7 @@ interface Contact {
   name: string;
   email?: string;
   phone?: string;
+  side: "customer" | "aws"; // who the contact represents
   lastContactedAt?: string;
   createdAt: string;
 }
@@ -47,6 +48,7 @@ interface Task {
   status: "open" | "done";
   companyId?: string;
   contactIds: string[];
+  owner?: string;
   createdAt: string;
 }
 
@@ -116,6 +118,9 @@ const route = async (m: Method, p: string, e: Ev) => {
   mt = p.match(/^\/tasks\/([^/]+)$/);
   if (mt && m === "PATCH") return updateTask(mt[1], e);
   if (mt && m === "DELETE") return deleteTask(mt[1]);
+  mt = p.match(/^\/tasks\/([^/]+)\/updates$/);
+  if (mt && m === "GET") return listTaskUpdates(mt[1]);
+  if (mt && m === "POST") return addTaskUpdate(mt[1], e);
 
   // summary + reminders + per-user activity
   if (p === "/summary" && m === "GET") return getSummary();
@@ -231,6 +236,7 @@ const listContacts = async (companyId: string) => {
       name: it.name,
       email: it.email,
       phone: it.phone,
+      side: (it.side as "customer" | "aws") ?? "customer",
       lastContactedAt: it.lastContactedAt,
       createdAt: it.createdAt,
     }))
@@ -238,9 +244,12 @@ const listContacts = async (companyId: string) => {
 };
 
 const createContact = async (companyId: string, e: Ev) => {
-  const body = parseBody<{ name: string; email?: string; phone?: string }>(
-    e.body
-  );
+  const body = parseBody<{
+    name: string;
+    email?: string;
+    phone?: string;
+    side?: "customer" | "aws";
+  }>(e.body);
   if (!body.name?.trim()) throw new HttpError(400, "name required");
   const c: Contact = {
     id: nid(),
@@ -248,6 +257,7 @@ const createContact = async (companyId: string, e: Ev) => {
     name: body.name.trim(),
     email: body.email,
     phone: body.phone,
+    side: body.side === "aws" ? "aws" : "customer",
     createdAt: now(),
   };
   await ddb.send(
@@ -286,6 +296,7 @@ const getContact = async (id: string) => {
     name: it.name,
     email: it.email,
     phone: it.phone,
+    side: (it.side as "customer" | "aws") ?? "customer",
     lastContactedAt: it.lastContactedAt,
     createdAt: it.createdAt,
   });
@@ -441,6 +452,7 @@ const listTasks = async () => {
     status: it.status,
     companyId: it.companyId,
     contactIds: it.contactIds ?? [],
+    owner: it.owner,
     createdAt: it.createdAt,
   }));
   return ok(items);
@@ -453,6 +465,7 @@ const createTask = async (e: Ev) => {
     dueDate?: string;
     companyId?: string;
     contactIds?: string[];
+    owner?: string;
   }>(e.body);
   if (!body.title?.trim()) throw new HttpError(400, "title required");
   if (!["low", "med", "high"].includes(body.priority))
@@ -465,6 +478,7 @@ const createTask = async (e: Ev) => {
     status: "open",
     companyId: body.companyId,
     contactIds: body.contactIds ?? [],
+    owner: body.owner,
     createdAt: now(),
   };
   await ddb.send(
@@ -502,6 +516,7 @@ const updateTask = async (id: string, e: Ev) => {
     priority?: "low" | "med" | "high";
     dueDate?: string | null;
     status?: "open" | "done";
+    owner?: string | null;
   }>(e.body);
   const sets: string[] = [];
   const names: Record<string, string> = {};
@@ -526,6 +541,11 @@ const updateTask = async (id: string, e: Ev) => {
     values[":s"] = body.status;
     values[":gp"] = `STATUS#${body.status}`;
   }
+  if (body.owner !== undefined) {
+    sets.push("#o = :o");
+    names["#o"] = "owner";
+    values[":o"] = body.owner ?? null;
+  }
   if (sets.length === 0) throw new HttpError(400, "no fields");
   await ddb.send(
     new UpdateCommand({
@@ -540,13 +560,23 @@ const updateTask = async (id: string, e: Ev) => {
 };
 
 const deleteTask = async (id: string) => {
-  // delete the task meta + all CONTACT-side link rows
-  await ddb.send(
-    new DeleteCommand({
+  // Delete every item under PK=TASK#<id>: META and all UPDATE# entries.
+  const own = await ddb.send(
+    new QueryCommand({
       TableName: TABLE,
-      Key: { PK: `TASK#${id}`, SK: "META" },
+      KeyConditionExpression: "PK = :p",
+      ExpressionAttributeValues: { ":p": `TASK#${id}` },
     })
   );
+  for (const it of own.Items ?? []) {
+    await ddb.send(
+      new DeleteCommand({
+        TableName: TABLE,
+        Key: { PK: it.PK, SK: it.SK },
+      })
+    );
+  }
+  // Plus all CONTACT-side link rows pointing at this task.
   const links = await ddb.send(
     new QueryCommand({
       TableName: TABLE,
@@ -564,6 +594,50 @@ const deleteTask = async (id: string) => {
     );
   }
   return noContent();
+};
+
+// ---------- task status updates (comment thread) ----------
+
+const listTaskUpdates = async (taskId: string) => {
+  const r = await ddb.send(
+    new QueryCommand({
+      TableName: TABLE,
+      KeyConditionExpression: "PK = :p AND begins_with(SK, :s)",
+      ExpressionAttributeValues: { ":p": `TASK#${taskId}`, ":s": "UPDATE#" },
+      ScanIndexForward: false,
+    })
+  );
+  return ok(
+    (r.Items ?? []).map((it) => ({
+      id: it.id,
+      text: it.text,
+      author: it.author,
+      createdAt: it.createdAt,
+    }))
+  );
+};
+
+const addTaskUpdate = async (taskId: string, e: Ev) => {
+  const body = parseBody<{ text: string }>(e.body);
+  if (!body.text?.trim()) throw new HttpError(400, "text required");
+  const ts = now();
+  const id = nid();
+  const author =
+    (e.requestContext.authorizer.jwt.claims.email as string) ?? "unknown";
+  await ddb.send(
+    new PutCommand({
+      TableName: TABLE,
+      Item: {
+        PK: `TASK#${taskId}`,
+        SK: `UPDATE#${ts}#${id}`,
+        id,
+        text: body.text.trim(),
+        author,
+        createdAt: ts,
+      },
+    })
+  );
+  return created({ id, text: body.text.trim(), author, createdAt: ts });
 };
 
 // ---------- summary + reminders ----------
