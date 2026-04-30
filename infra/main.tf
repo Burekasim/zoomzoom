@@ -5,6 +5,10 @@ terraform {
       source  = "hashicorp/aws"
       version = "~> 5.50"
     }
+    random = {
+      source  = "hashicorp/random"
+      version = "~> 3.6"
+    }
   }
   # Backend config (bucket/key/region) supplied at init time via -backend-config.
   # Local runs work without it; CI passes the values.

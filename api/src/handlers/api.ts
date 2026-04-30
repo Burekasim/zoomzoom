@@ -52,8 +52,23 @@ interface Task {
 export const handler = async (
   event: Ev
 ): Promise<APIGatewayProxyResultV2> => {
+  // Reject anything that didn't come through CloudFront. CloudFront injects
+  // x-origin-verify with a value matching ORIGIN_SECRET; direct hits to the
+  // API Gateway URL won't have it.
+  const expected = process.env.ORIGIN_SECRET;
+  if (expected) {
+    const got =
+      event.headers["x-origin-verify"] ??
+      event.headers["X-Origin-Verify"];
+    if (got !== expected) return json(403, { error: "forbidden" });
+  }
+
   const method = event.requestContext.http.method as Method;
-  const path = event.rawPath.replace(/\/+$/, "") || "/";
+  let path = event.rawPath.replace(/\/+$/, "") || "/";
+  // Strip the /api prefix added by the CloudFront → API Gateway path.
+  if (path.startsWith("/api/")) path = path.slice(4);
+  else if (path === "/api") path = "/";
+
   try {
     return await route(method, path, event);
   } catch (e: any) {

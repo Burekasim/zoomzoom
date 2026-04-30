@@ -36,6 +36,27 @@ resource "aws_cloudfront_distribution" "web" {
     origin_access_control_id = aws_cloudfront_origin_access_control.web.id
   }
 
+  origin {
+    origin_id   = "api"
+    domain_name = replace(aws_apigatewayv2_api.http.api_endpoint, "https://", "")
+
+    custom_origin_config {
+      http_port              = 80
+      https_port             = 443
+      origin_protocol_policy = "https-only"
+      origin_ssl_protocols   = ["TLSv1.2"]
+    }
+
+    # CloudFront injects this header on every forwarded request. The Lambda
+    # rejects (403) anything missing or mismatched, so direct hits to the
+    # API Gateway URL fail. HTTP APIs don't support resource policies, so
+    # this is the lock-down mechanism.
+    custom_header {
+      name  = "x-origin-verify"
+      value = random_password.cf_to_api_secret.result
+    }
+  }
+
   default_cache_behavior {
     target_origin_id       = "s3"
     viewer_protocol_policy = "redirect-to-https"
@@ -44,6 +65,18 @@ resource "aws_cloudfront_distribution" "web" {
     compress               = true
 
     cache_policy_id = "658327ea-f89d-4fab-a63d-7e88639e58f6" # Managed-CachingOptimized
+  }
+
+  ordered_cache_behavior {
+    path_pattern           = "/api/*"
+    target_origin_id       = "api"
+    viewer_protocol_policy = "https-only"
+    allowed_methods        = ["GET", "HEAD", "OPTIONS", "PUT", "POST", "PATCH", "DELETE"]
+    cached_methods         = ["GET", "HEAD"]
+    compress               = true
+
+    cache_policy_id          = "4135ea2d-6df8-44a3-9df3-4b5a84be39ad" # Managed-CachingDisabled
+    origin_request_policy_id = "b689b0a8-53d0-40ab-baf2-68738e2966ac" # Managed-AllViewerExceptHostHeader
   }
 
   custom_error_response {

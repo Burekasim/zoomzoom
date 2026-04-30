@@ -1,13 +1,7 @@
 resource "aws_apigatewayv2_api" "http" {
   name          = "${local.name}-api"
   protocol_type = "HTTP"
-
-  cors_configuration {
-    allow_origins = ["*"]
-    allow_methods = ["GET", "POST", "PATCH", "DELETE", "OPTIONS"]
-    allow_headers = ["authorization", "content-type"]
-    max_age       = 300
-  }
+  # No CORS — same-origin via CloudFront. Direct hits are blocked anyway.
 }
 
 resource "aws_apigatewayv2_authorizer" "jwt" {
@@ -38,10 +32,12 @@ resource "aws_lambda_permission" "api" {
   source_arn    = "${aws_apigatewayv2_api.http.execution_arn}/*/*"
 }
 
-# Catch-all route — the Lambda handles routing internally.
-resource "aws_apigatewayv2_route" "default" {
+# CloudFront forwards /api/* — match that path explicitly so direct hits
+# to the API Gateway URL on any other path return 404 immediately
+# (defense in depth alongside the secret header check).
+resource "aws_apigatewayv2_route" "api" {
   api_id             = aws_apigatewayv2_api.http.id
-  route_key          = "ANY /{proxy+}"
+  route_key          = "ANY /api/{proxy+}"
   target             = "integrations/${aws_apigatewayv2_integration.api.id}"
   authorization_type = "JWT"
   authorizer_id      = aws_apigatewayv2_authorizer.jwt.id

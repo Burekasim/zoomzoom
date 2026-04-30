@@ -65,9 +65,10 @@ resource "aws_lambda_function" "fn" {
   source_code_hash = filebase64sha256("${path.module}/../api/dist/${each.value}.zip")
 
   environment {
-    variables = {
-      TABLE_NAME = aws_dynamodb_table.main.name
-    }
+    variables = merge(
+      { TABLE_NAME = aws_dynamodb_table.main.name },
+      each.value == "api" ? { ORIGIN_SECRET = random_password.cf_to_api_secret.result } : {}
+    )
   }
 }
 

@@ -105,8 +105,9 @@ jobs:
       - name: Build frontend
         working-directory: web
         run: |
+          # API goes through CloudFront, same-origin: no CORS, locked down.
           cat > .env.production <<EOF
-          VITE_API_URL=${{ steps.tf.outputs.api_url }}
+          VITE_API_URL=${{ steps.tf.outputs.cloudfront_url }}/api
           VITE_COGNITO_DOMAIN=${{ steps.tf.outputs.cognito_domain }}
           VITE_USER_POOL_CLIENT_ID=${{ steps.tf.outputs.client_id }}
           EOF
