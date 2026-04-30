@@ -1,16 +1,18 @@
 import { useEffect, useMemo, useState } from "react";
-import { api, Company, Contact, Task, TaskOwner } from "../api";
+import { api, Company, Contact, Task } from "../api";
 import { me } from "../auth";
 
 const STALE_DAYS = 14;
+const ROSTER = ["avi", "nir", "tomer"] as const;
+type RosterMember = (typeof ROSTER)[number];
 
 // SSO emails look like "avi.keinan@gmail.com" / "nir.something@doit.com" — we
 // pick the first segment of the local part and only accept the fixed roster.
-const ownerFromEmail = (email?: string): TaskOwner | "" => {
+const ownerFromEmail = (email?: string): RosterMember | "" => {
   if (!email) return "";
   const first = email.split("@")[0].toLowerCase().split(".")[0];
-  return (["avi", "nir", "tomer"] as const).includes(first as TaskOwner)
-    ? (first as TaskOwner)
+  return (ROSTER as readonly string[]).includes(first)
+    ? (first as RosterMember)
     : "";
 };
 
