@@ -45,6 +45,10 @@ resource "aws_cognito_user_pool_client" "web" {
   name         = "${local.name}-web"
   user_pool_id = aws_cognito_user_pool.main.id
 
+  # Make sure the SAML IdP exists before the client tries to list it in
+  # supported_identity_providers (otherwise the API rejects the update).
+  depends_on = [aws_cognito_identity_provider.sso]
+
   generate_secret                      = false
   allowed_oauth_flows_user_pool_client = true
   allowed_oauth_flows                  = ["code"]
