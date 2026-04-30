@@ -38,6 +38,7 @@ interface Contact {
   phone?: string;
   side: "customer" | "aws"; // who the contact represents
   lastContactedAt?: string;
+  lastContactedBy?: string;
   createdAt: string;
 }
 interface Task {
@@ -238,6 +239,7 @@ const listContacts = async (companyId: string) => {
       phone: it.phone,
       side: (it.side as "customer" | "aws") ?? "customer",
       lastContactedAt: it.lastContactedAt,
+      lastContactedBy: it.lastContactedBy,
       createdAt: it.createdAt,
     }))
   );
@@ -298,6 +300,7 @@ const getContact = async (id: string) => {
     phone: it.phone,
     side: (it.side as "customer" | "aws") ?? "customer",
     lastContactedAt: it.lastContactedAt,
+    lastContactedBy: it.lastContactedBy,
     createdAt: it.createdAt,
   });
 };

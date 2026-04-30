@@ -5,6 +5,7 @@ import { Summary } from "./components/Summary";
 import { Reminders } from "./components/Reminders";
 import { UserActivity } from "./components/UserActivity";
 import { ThemeToggle } from "./components/ThemeToggle";
+import { MyDigest } from "./components/MyDigest";
 
 export const App = () => {
   const [authed, setAuthed] = useState(false);
@@ -55,6 +56,8 @@ export const App = () => {
       <main>
         <CompanyGrid refreshKey={reloadKey} onChanged={reload} />
       </main>
+
+      <MyDigest refreshKey={reloadKey} onChanged={reload} />
     </div>
   );
 };

@@ -39,6 +39,7 @@ export type Contact = {
   phone?: string;
   side: ContactSide;
   lastContactedAt?: string;
+  lastContactedBy?: string;
   createdAt: string;
 };
 export type TaskOwner = "avi" | "nir" | "tomer" | "";
