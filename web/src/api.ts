@@ -1,5 +1,5 @@
 import { config } from "./config";
-import { getToken } from "./auth";
+import { getToken, login } from "./auth";
 
 const req = async <T>(
   method: string,
@@ -14,6 +14,13 @@ const req = async <T>(
     },
     body: body !== undefined ? JSON.stringify(body) : undefined,
   });
+  // Token expired or invalid: drop it and bounce back to Cognito login.
+  // login() navigates the page, so the throw below is just defensive.
+  if (res.status === 401) {
+    localStorage.removeItem("zz_id_token");
+    await login();
+    throw new Error("session expired — redirecting to login");
+  }
   if (!res.ok) {
     const text = await res.text();
     throw new Error(`${res.status} ${method} ${path}: ${text}`);
