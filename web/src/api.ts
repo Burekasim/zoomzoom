@@ -54,6 +54,12 @@ export type Reminder = {
   targetName: string;
   lastSeenAt?: string;
 };
+export type UserActivity = {
+  email: string;
+  lastInteractionAt: string;
+  lastContactId: string;
+  lastContactName: string;
+};
 
 export const api = {
   listCompanies: () => req<Company[]>("GET", "/companies"),
@@ -97,4 +103,5 @@ export const api = {
       openTasks: number;
     }>("GET", "/summary"),
   reminders: () => req<Reminder[]>("GET", "/reminders"),
+  userActivity: () => req<UserActivity[]>("GET", "/users/activity"),
 };

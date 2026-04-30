@@ -98,7 +98,7 @@ const route = async (m: Method, p: string, e: Ev) => {
   if (mt && m === "PATCH") return updateContact(mt[1], e);
   if (mt && m === "DELETE") return deleteContact(mt[1]);
   mt = p.match(/^\/contacts\/([^/]+)\/contacted$/);
-  if (mt && m === "POST") return markContacted(mt[1]);
+  if (mt && m === "POST") return markContacted(mt[1], e);
   mt = p.match(/^\/contacts\/([^/]+)\/notes$/);
   if (mt && m === "POST") return createNote(`CONTACT#${mt[1]}`, e);
 
@@ -116,9 +116,10 @@ const route = async (m: Method, p: string, e: Ev) => {
   if (mt && m === "PATCH") return updateTask(mt[1], e);
   if (mt && m === "DELETE") return deleteTask(mt[1]);
 
-  // summary + reminders
+  // summary + reminders + per-user activity
   if (p === "/summary" && m === "GET") return getSummary();
   if (p === "/reminders" && m === "GET") return listReminders();
+  if (p === "/users/activity" && m === "GET") return listUserActivity();
 
   return notFound(`no route for ${m} ${p}`);
 };
@@ -330,19 +331,42 @@ const deleteContact = async (id: string) => {
   return noContent();
 };
 
-const markContacted = async (id: string) => {
+const markContacted = async (id: string, e: Ev) => {
   const it = await findContact(id);
   if (!it) return notFound();
   const ts = now();
+  const author =
+    (e.requestContext.authorizer.jwt.claims.email as string) ?? "unknown";
+
+  // Update the contact record with both the timestamp and who logged it.
   await ddb.send(
     new UpdateCommand({
       TableName: TABLE,
       Key: { PK: it.PK, SK: it.SK },
-      UpdateExpression: "SET lastContactedAt = :t",
-      ExpressionAttributeValues: { ":t": ts },
+      UpdateExpression: "SET lastContactedAt = :t, lastContactedBy = :u",
+      ExpressionAttributeValues: { ":t": ts, ":u": author },
     })
   );
-  return ok({ id, lastContactedAt: ts });
+
+  // Upsert a per-user activity record so we can show "last interaction"
+  // by SSO user on the dashboard. GSI1 lets us list all users sorted.
+  await ddb.send(
+    new PutCommand({
+      TableName: TABLE,
+      Item: {
+        PK: `USER#${author}`,
+        SK: "LAST_INTERACTION",
+        GSI1PK: "USERS#ALL",
+        GSI1SK: ts,
+        email: author,
+        lastInteractionAt: ts,
+        lastContactId: it.id,
+        lastContactName: it.name,
+      },
+    })
+  );
+
+  return ok({ id, lastContactedAt: ts, lastContactedBy: author });
 };
 
 // ---------- notes ----------
@@ -584,6 +608,26 @@ const countTasks = async () => {
   const open = await countByGSI("STATUS#open");
   const done = await countByGSI("STATUS#done");
   return { open, total: open + done };
+};
+
+const listUserActivity = async () => {
+  const r = await ddb.send(
+    new QueryCommand({
+      TableName: TABLE,
+      IndexName: "GSI1",
+      KeyConditionExpression: "GSI1PK = :p",
+      ExpressionAttributeValues: { ":p": "USERS#ALL" },
+      ScanIndexForward: false, // newest interactions first
+    })
+  );
+  return ok(
+    (r.Items ?? []).map((it) => ({
+      email: it.email,
+      lastInteractionAt: it.lastInteractionAt,
+      lastContactId: it.lastContactId,
+      lastContactName: it.lastContactName,
+    }))
+  );
 };
 
 const listReminders = async () => {

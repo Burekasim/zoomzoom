@@ -5,6 +5,8 @@ import { Detail } from "./components/Detail";
 import { Tasks } from "./components/Tasks";
 import { Summary } from "./components/Summary";
 import { Reminders } from "./components/Reminders";
+import { UserActivity } from "./components/UserActivity";
+import { ThemeToggle } from "./components/ThemeToggle";
 
 type Selection =
   | { type: "company"; id: string; name: string }
@@ -39,16 +41,28 @@ export const App = () => {
   return (
     <div className="app">
       <header>
-        <h1>zoomzoom</h1>
-        <span className="user">{me().email}</span>
-        <button onClick={logout}>Sign out</button>
+        <h1>
+          <span className="brand-mark">zz</span> zoomzoom
+        </h1>
+        <div className="header-right">
+          <span className="user">{me().email}</span>
+          <ThemeToggle />
+          <button className="btn-ghost" onClick={logout}>
+            Sign out
+          </button>
+        </div>
       </header>
 
-      <Summary refreshKey={reloadKey} />
+      <div className="dashboard">
+        <Summary refreshKey={reloadKey} />
+        <UserActivity refreshKey={reloadKey} />
+      </div>
+
       <Reminders refreshKey={reloadKey} />
 
       <main className={sel ? "with-detail" : "without-detail"}>
         <aside className="tree-pane">
+          <div className="pane-header">Companies</div>
           <Tree
             refreshKey={reloadKey}
             onSelect={setSel}

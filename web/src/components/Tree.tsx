@@ -1,6 +1,18 @@
 import { useEffect, useState } from "react";
 import { api, Company, Contact } from "../api";
 
+const contactTooltip = (p: Contact) => {
+  const lines = [p.name];
+  if (p.email) lines.push(p.email);
+  if (p.phone) lines.push(p.phone);
+  lines.push(
+    p.lastContactedAt
+      ? `Last contacted: ${new Date(p.lastContactedAt).toLocaleDateString()}`
+      : "Never contacted"
+  );
+  return lines.join("\n");
+};
+
 type Selected =
   | { type: "company"; id: string; name: string }
   | { type: "contact"; id: string; name: string; companyId: string };
@@ -83,6 +95,7 @@ export const Tree = ({ refreshKey, selectedId, onSelect, onChanged }: Props) => 
                   <li
                     key={p.id}
                     className={selectedId === p.id ? "sel" : ""}
+                    title={contactTooltip(p)}
                     onClick={() =>
                       onSelect({
                         type: "contact",
