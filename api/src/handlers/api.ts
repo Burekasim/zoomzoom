@@ -45,6 +45,7 @@ interface Task {
   priority: "low" | "med" | "high";
   dueDate?: string;
   status: "open" | "done";
+  companyId?: string;
   contactIds: string[];
   createdAt: string;
 }
@@ -438,6 +439,7 @@ const listTasks = async () => {
     priority: it.priority,
     dueDate: it.dueDate,
     status: it.status,
+    companyId: it.companyId,
     contactIds: it.contactIds ?? [],
     createdAt: it.createdAt,
   }));
@@ -449,6 +451,7 @@ const createTask = async (e: Ev) => {
     title: string;
     priority: "low" | "med" | "high";
     dueDate?: string;
+    companyId?: string;
     contactIds?: string[];
   }>(e.body);
   if (!body.title?.trim()) throw new HttpError(400, "title required");
@@ -460,6 +463,7 @@ const createTask = async (e: Ev) => {
     priority: body.priority,
     dueDate: body.dueDate,
     status: "open",
+    companyId: body.companyId,
     contactIds: body.contactIds ?? [],
     createdAt: now(),
   };

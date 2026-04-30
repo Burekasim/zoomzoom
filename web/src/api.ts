@@ -38,6 +38,7 @@ export type Task = {
   priority: "low" | "med" | "high";
   dueDate?: string;
   status: "open" | "done";
+  companyId?: string;
   contactIds: string[];
   createdAt: string;
 };
@@ -82,6 +83,7 @@ export const api = {
     title: string;
     priority: "low" | "med" | "high";
     dueDate?: string;
+    companyId?: string;
     contactIds?: string[];
   }) => req<Task>("POST", "/tasks", t),
   updateTask: (id: string, patch: Partial<Task>) =>

@@ -1,21 +1,13 @@
 import { useEffect, useState } from "react";
 import { getToken, isExpired, login, handleCallback, logout, me } from "./auth";
-import { Tree } from "./components/Tree";
-import { Detail } from "./components/Detail";
-import { Tasks } from "./components/Tasks";
+import { CompanyGrid } from "./components/CompanyGrid";
 import { Summary } from "./components/Summary";
 import { Reminders } from "./components/Reminders";
 import { UserActivity } from "./components/UserActivity";
 import { ThemeToggle } from "./components/ThemeToggle";
 
-type Selection =
-  | { type: "company"; id: string; name: string }
-  | { type: "contact"; id: string; name: string; companyId: string }
-  | null;
-
 export const App = () => {
   const [authed, setAuthed] = useState(false);
-  const [sel, setSel] = useState<Selection>(null);
   const [reloadKey, setReloadKey] = useState(0);
 
   useEffect(() => {
@@ -60,24 +52,8 @@ export const App = () => {
 
       <Reminders refreshKey={reloadKey} />
 
-      <main className={sel ? "with-detail" : "without-detail"}>
-        <aside className="tree-pane">
-          <div className="pane-header">Companies</div>
-          <Tree
-            refreshKey={reloadKey}
-            onSelect={setSel}
-            selectedId={sel?.id}
-            onChanged={reload}
-          />
-        </aside>
-        {sel && (
-          <section className="detail-pane">
-            <Detail key={sel.id} sel={sel} onChanged={reload} />
-          </section>
-        )}
-        <section className="tasks-pane">
-          <Tasks refreshKey={reloadKey} onChanged={reload} />
-        </section>
+      <main>
+        <CompanyGrid refreshKey={reloadKey} onChanged={reload} />
       </main>
     </div>
   );
