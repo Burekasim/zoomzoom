@@ -64,7 +64,7 @@ jobs:
       - name: Build Lambda bundles
         working-directory: api
         run: |
-          npm ci
+          npm install --no-audit --no-fund
           npm run build
 
       - name: Terraform init
@@ -110,7 +110,7 @@ jobs:
           VITE_COGNITO_DOMAIN=${{ steps.tf.outputs.cognito_domain }}
           VITE_USER_POOL_CLIENT_ID=${{ steps.tf.outputs.client_id }}
           EOF
-          npm ci
+          npm install --no-audit --no-fund
           npm run build
 
       - name: Sync frontend to S3 + invalidate CloudFront
