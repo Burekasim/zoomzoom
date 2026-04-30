@@ -82,8 +82,15 @@ header .user { color: var(--muted); }
 
 main {
   display: grid;
-  grid-template-columns: 280px 1fr 380px;
   overflow: hidden;
+}
+/* Detail visible: tree | detail (medium) | tasks (dominant) */
+main.with-detail {
+  grid-template-columns: 260px minmax(360px, 1fr) 2.5fr;
+}
+/* Nothing selected: tree | tasks fills the rest */
+main.without-detail {
+  grid-template-columns: 260px 1fr;
 }
 main > * {
   border-right: 1px solid var(--border);

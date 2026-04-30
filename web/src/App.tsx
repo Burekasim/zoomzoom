@@ -47,7 +47,7 @@ export const App = () => {
       <Summary refreshKey={reloadKey} />
       <Reminders refreshKey={reloadKey} />
 
-      <main>
+      <main className={sel ? "with-detail" : "without-detail"}>
         <aside className="tree-pane">
           <Tree
             refreshKey={reloadKey}
@@ -56,13 +56,11 @@ export const App = () => {
             onChanged={reload}
           />
         </aside>
-        <section className="detail-pane">
-          {sel ? (
+        {sel && (
+          <section className="detail-pane">
             <Detail key={sel.id} sel={sel} onChanged={reload} />
-          ) : (
-            <div className="empty">Pick a company or contact on the left.</div>
-          )}
-        </section>
+          </section>
+        )}
         <section className="tasks-pane">
           <Tasks refreshKey={reloadKey} onChanged={reload} />
         </section>
