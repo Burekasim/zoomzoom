@@ -1,0 +1,128 @@
+name: Deploy
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+    inputs:
+      saml_metadata_url:
+        description: "Override IAM Identity Center SAML metadata URL (otherwise uses vars.SAML_METADATA_URL)"
+        required: false
+        type: string
+
+# OIDC token + read for actions/checkout. Nothing else.
+permissions:
+  id-token: write
+  contents: read
+
+# Serialize so two pushes don't race on the same Terraform state.
+concurrency:
+  group: deploy-production
+  cancel-in-progress: false
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    environment: production
+    env:
+      AWS_REGION: us-east-1
+      TF_STATE_BUCKET: zoomzoom-tfstate-669962866722
+      SAML_METADATA_URL: ${{ inputs.saml_metadata_url || vars.SAML_METADATA_URL }}
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+
+      - uses: hashicorp/setup-terraform@v3
+        with:
+          terraform_version: "1.5.7"
+
+      - name: Configure AWS credentials (OIDC)
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: ${{ vars.AWS_ROLE_ARN }}
+          aws-region: ${{ env.AWS_REGION }}
+
+      - name: Ensure Terraform state bucket exists
+        run: |
+          set -euo pipefail
+          if ! aws s3api head-bucket --bucket "$TF_STATE_BUCKET" 2>/dev/null; then
+            aws s3api create-bucket --bucket "$TF_STATE_BUCKET" --region "$AWS_REGION"
+            aws s3api put-bucket-versioning --bucket "$TF_STATE_BUCKET" \
+              --versioning-configuration Status=Enabled
+            aws s3api put-bucket-encryption --bucket "$TF_STATE_BUCKET" \
+              --server-side-encryption-configuration '{
+                "Rules": [{"ApplyServerSideEncryptionByDefault": {"SSEAlgorithm": "AES256"}}]
+              }'
+            aws s3api put-public-access-block --bucket "$TF_STATE_BUCKET" \
+              --public-access-block-configuration BlockPublicAcls=true,IgnorePublicAcls=true,BlockPublicPolicy=true,RestrictPublicBuckets=true
+          fi
+
+      - name: Build Lambda bundles
+        working-directory: api
+        run: |
+          npm ci
+          npm run build
+
+      - name: Terraform init
+        working-directory: infra
+        run: |
+          terraform init -input=false \
+            -backend-config="bucket=$TF_STATE_BUCKET" \
+            -backend-config="key=zoomzoom.tfstate" \
+            -backend-config="region=$AWS_REGION"
+
+      - name: Terraform fmt + validate
+        working-directory: infra
+        run: |
+          terraform fmt -check -recursive
+          terraform validate
+
+      - name: Terraform apply
+        working-directory: infra
+        run: |
+          terraform apply -auto-approve -input=false \
+            -var="aws_profile=" \
+            -var="aws_region=$AWS_REGION" \
+            -var="saml_metadata_url=${SAML_METADATA_URL:-}"
+
+      - name: Capture Terraform outputs
+        id: tf
+        working-directory: infra
+        run: |
+          {
+            echo "api_url=$(terraform output -raw api_url)"
+            echo "cognito_domain=$(terraform output -raw cognito_domain)"
+            echo "client_id=$(terraform output -raw user_pool_client_id)"
+            echo "web_bucket=$(terraform output -raw web_bucket)"
+            echo "cloudfront_id=$(terraform output -raw cloudfront_id)"
+            echo "cloudfront_url=$(terraform output -raw cloudfront_url)"
+          } >> "$GITHUB_OUTPUT"
+
+      - name: Build frontend
+        working-directory: web
+        run: |
+          cat > .env.production <<EOF
+          VITE_API_URL=${{ steps.tf.outputs.api_url }}
+          VITE_COGNITO_DOMAIN=${{ steps.tf.outputs.cognito_domain }}
+          VITE_USER_POOL_CLIENT_ID=${{ steps.tf.outputs.client_id }}
+          EOF
+          npm ci
+          npm run build
+
+      - name: Sync frontend to S3 + invalidate CloudFront
+        run: |
+          aws s3 sync web/dist "s3://${{ steps.tf.outputs.web_bucket }}/" --delete
+          aws cloudfront create-invalidation \
+            --distribution-id "${{ steps.tf.outputs.cloudfront_id }}" \
+            --paths '/*' >/dev/null
+
+      - name: Summary
+        run: |
+          echo "### ✅ Deployed" >> "$GITHUB_STEP_SUMMARY"
+          echo "" >> "$GITHUB_STEP_SUMMARY"
+          echo "- App: ${{ steps.tf.outputs.cloudfront_url }}" >> "$GITHUB_STEP_SUMMARY"
+          echo "- API: ${{ steps.tf.outputs.api_url }}" >> "$GITHUB_STEP_SUMMARY"

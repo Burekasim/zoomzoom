@@ -55,8 +55,15 @@ resource "aws_cognito_user_pool_client" "web" {
     var.saml_metadata_url == "" ? [] : ["AWSIdentityCenter"]
   )
 
-  callback_urls = var.callback_urls
-  logout_urls   = var.callback_urls
+  # Auto-include the CloudFront origin so we don't need a second apply.
+  callback_urls = concat(
+    var.callback_urls,
+    ["https://${aws_cloudfront_distribution.web.domain_name}/callback"]
+  )
+  logout_urls = concat(
+    var.callback_urls,
+    ["https://${aws_cloudfront_distribution.web.domain_name}"]
+  )
 
   explicit_auth_flows = [
     "ALLOW_USER_SRP_AUTH",

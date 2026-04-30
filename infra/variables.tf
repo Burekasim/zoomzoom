@@ -1,7 +1,7 @@
 variable "aws_profile" {
   type        = string
-  default     = "doit-playground"
-  description = "AWS CLI profile to use."
+  default     = ""
+  description = "AWS CLI profile to use. Leave empty in CI (uses env credentials from OIDC role)."
 }
 
 variable "aws_region" {

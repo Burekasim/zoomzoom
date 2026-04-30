@@ -14,8 +14,18 @@ echo "[1/5] Building Lambda bundles…"
 ( cd api && npm install --silent && npm run build )
 
 echo "[2/5] Terraform apply…"
+ACCOUNT_ID=$(aws sts get-caller-identity --profile "$PROFILE" --query Account --output text)
+TF_STATE_BUCKET="zoomzoom-tfstate-$ACCOUNT_ID"
+aws s3api head-bucket --bucket "$TF_STATE_BUCKET" --profile "$PROFILE" 2>/dev/null || \
+  aws s3api create-bucket --bucket "$TF_STATE_BUCKET" --region "$REGION" --profile "$PROFILE" >/dev/null
+aws s3api put-bucket-versioning --bucket "$TF_STATE_BUCKET" \
+  --versioning-configuration Status=Enabled --profile "$PROFILE"
+
 ( cd infra
-  terraform init -upgrade
+  terraform init -upgrade -reconfigure \
+    -backend-config="bucket=$TF_STATE_BUCKET" \
+    -backend-config="key=zoomzoom.tfstate" \
+    -backend-config="region=$REGION"
   terraform apply -auto-approve \
     -var="aws_profile=$PROFILE" \
     -var="aws_region=$REGION" \
