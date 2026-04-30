@@ -6,11 +6,19 @@ const STALE_DAYS = 14;
 const ROSTER = ["avi", "nir", "tomer"] as const;
 type RosterMember = (typeof ROSTER)[number];
 
-// SSO emails look like "avi.keinan@gmail.com" / "nir.something@doit.com" — we
-// pick the first segment of the local part and only accept the fixed roster.
+// Hard-coded SSO email → owner-key mapping for the doit team. Anything else
+// falls through to the local-part heuristic so this still works in dev.
+const EMAIL_TO_OWNER: Record<string, RosterMember> = {
+  "avik@doit.com": "avi",
+  "tomer.m@doit.com": "tomer",
+  "nir.maayan@doit.com": "nir",
+};
+
 const ownerFromEmail = (email?: string): RosterMember | "" => {
   if (!email) return "";
-  const first = email.split("@")[0].toLowerCase().split(".")[0];
+  const lower = email.toLowerCase();
+  if (EMAIL_TO_OWNER[lower]) return EMAIL_TO_OWNER[lower];
+  const first = lower.split("@")[0].split(".")[0];
   return (ROSTER as readonly string[]).includes(first)
     ? (first as RosterMember)
     : "";
