@@ -1,0 +1,33 @@
+.DS_Store
+node_modules/
+dist/
+build/
+
+# Terraform
+.terraform/
+.terraform.lock.hcl
+*.tfstate
+*.tfstate.*
+*.tfvars
+!example.tfvars
+crash.log
+crash.*.log
+override.tf
+override.tf.json
+*_override.tf
+*_override.tf.json
+
+# Lambda build artifacts
+api/dist/
+api/*.zip
+
+# Frontend
+web/dist/
+web/.vite/
+.env
+.env.local
+
+# IDE
+.vscode/
+.idea/
+*.swp
