@@ -43,9 +43,11 @@ const fmtDue = (iso?: string) => {
 export const MyDigest = ({
   refreshKey,
   onChanged,
+  onTaskClick,
 }: {
   refreshKey: number;
   onChanged: () => void;
+  onTaskClick?: (companyId: string, taskId: string) => void;
 }) => {
   const [open, setOpen] = useState(true);
   const [companies, setCompanies] = useState<Company[]>([]);
@@ -139,8 +141,19 @@ export const MyDigest = ({
               <div className="digest-empty">Nothing assigned to you.</div>
             ) : (
               <ul className="digest-tasks">
-                {myTasks.map((t) => (
-                  <li key={t.id}>
+                {myTasks.map((t) => {
+                  const clickable = !!(onTaskClick && t.companyId);
+                  return (
+                  <li
+                    key={t.id}
+                    className={clickable ? "clickable" : undefined}
+                    onClick={
+                      clickable
+                        ? () => onTaskClick!(t.companyId!, t.id)
+                        : undefined
+                    }
+                    title={clickable ? "Jump to this task in the company card" : t.title}
+                  >
                     <span className={`prio prio-${t.priority}`}>
                       {t.priority}
                     </span>
@@ -165,7 +178,8 @@ export const MyDigest = ({
                       )}
                     </span>
                   </li>
-                ))}
+                  );
+                })}
               </ul>
             )}
           </section>

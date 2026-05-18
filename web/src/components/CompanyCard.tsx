@@ -8,6 +8,7 @@ import {
   Note,
   TaskUpdate,
 } from "../api";
+import type { TaskHighlight } from "../App";
 
 const TASK_OWNERS = ["avi", "nir", "tomer"] as const;
 
@@ -65,6 +66,7 @@ type Props = {
   tasks: Task[];
   onChanged: () => void;
   onMove: (sourceId: string, targetId: string) => void;
+  highlight: TaskHighlight | null;
 };
 
 export const CompanyCard = ({
@@ -74,6 +76,7 @@ export const CompanyCard = ({
   tasks,
   onChanged,
   onMove,
+  highlight,
 }: Props) => {
   const cardRef = useRef<HTMLDivElement>(null);
   const [sizeStyle] = useState(() => {
@@ -101,6 +104,26 @@ export const CompanyCard = ({
       ro.disconnect();
     };
   }, [company.id]);
+
+  // Scroll-to + pulse when a task is clicked in the digest. The effect
+  // re-runs whenever highlight.ts changes, so clicking the same task twice
+  // re-triggers the animation. Forcing reflow before re-adding the class
+  // restarts the CSS animation.
+  useEffect(() => {
+    if (!highlight) return;
+    const card = cardRef.current;
+    if (!card) return;
+    const row = card.querySelector<HTMLElement>(
+      `[data-task-id="${highlight.taskId}"]`
+    );
+    if (!row) return;
+    row.scrollIntoView({ behavior: "smooth", block: "center" });
+    row.classList.remove("task-row-highlight");
+    void row.offsetWidth;
+    row.classList.add("task-row-highlight");
+    const t = setTimeout(() => row.classList.remove("task-row-highlight"), 2400);
+    return () => clearTimeout(t);
+  }, [highlight?.ts, highlight?.taskId]);
 
   const [newContactName, setNewContactName] = useState("");
   const [newContactSide, setNewContactSide] = useState<ContactSide>("customer");
@@ -564,7 +587,10 @@ const TaskRow = ({
     .filter((c): c is Contact => !!c);
 
   return (
-    <li className={`task-row prio-${task.priority} ${task.status}`}>
+    <li
+      className={`task-row prio-${task.priority} ${task.status}`}
+      data-task-id={task.id}
+    >
       <div
         className="task-summary"
         onClick={(e) => {

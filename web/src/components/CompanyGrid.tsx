@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 import { api, Company, Contact, Task } from "../api";
 import { CompanyCard } from "./CompanyCard";
+import type { TaskHighlight } from "../App";
 
 const PALETTE_SIZE = 8;
 const colorFor = (id: string) => {
@@ -24,9 +25,11 @@ const saveOrder = (ids: string[]) => {
 export const CompanyGrid = ({
   refreshKey,
   onChanged,
+  highlight,
 }: {
   refreshKey: number;
   onChanged: () => void;
+  highlight: TaskHighlight | null;
 }) => {
   const [companies, setCompanies] = useState<Company[]>([]);
   const [contactsByCo, setContactsByCo] = useState<Record<string, Contact[]>>({});
@@ -112,6 +115,7 @@ export const CompanyGrid = ({
             tasks={tasksByCo[c.id] ?? []}
             onChanged={onChanged}
             onMove={moveCard}
+            highlight={highlight && highlight.companyId === c.id ? highlight : null}
           />
         ))}
         <div className="company-add-card">

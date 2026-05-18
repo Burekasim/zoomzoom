@@ -7,9 +7,12 @@ import { UserActivity } from "./components/UserActivity";
 import { ThemeToggle } from "./components/ThemeToggle";
 import { MyDigest } from "./components/MyDigest";
 
+export type TaskHighlight = { companyId: string; taskId: string; ts: number };
+
 export const App = () => {
   const [authed, setAuthed] = useState(false);
   const [reloadKey, setReloadKey] = useState(0);
+  const [highlight, setHighlight] = useState<TaskHighlight | null>(null);
 
   useEffect(() => {
     (async () => {
@@ -54,10 +57,20 @@ export const App = () => {
       <Reminders refreshKey={reloadKey} />
 
       <main>
-        <CompanyGrid refreshKey={reloadKey} onChanged={reload} />
+        <CompanyGrid
+          refreshKey={reloadKey}
+          onChanged={reload}
+          highlight={highlight}
+        />
       </main>
 
-      <MyDigest refreshKey={reloadKey} onChanged={reload} />
+      <MyDigest
+        refreshKey={reloadKey}
+        onChanged={reload}
+        onTaskClick={(companyId, taskId) =>
+          setHighlight({ companyId, taskId, ts: Date.now() })
+        }
+      />
     </div>
   );
 };

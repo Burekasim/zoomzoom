@@ -448,6 +448,23 @@ main { padding: 16px; flex: 1; }
 
 .empty-row { color: var(--fg-subtle); font-size: 12px; padding: 6px 8px; font-style: italic; }
 
+/* Pulse a task row when its sibling is clicked in the digest. */
+@keyframes pulse-task-highlight {
+  0%, 100% {
+    box-shadow: 0 0 0 0 rgba(0, 0, 0, 0);
+    background: var(--panel-2);
+  }
+  50% {
+    box-shadow: 0 0 0 3px var(--accent);
+    background: var(--accent-bg);
+  }
+}
+.task-row.task-row-highlight {
+  animation: pulse-task-highlight 0.6s ease-in-out 4;
+  position: relative;
+  z-index: 1;
+}
+
 /* ── Task expanded details ────────────────────────────────────── */
 .task-details {
   border-top: 1px dashed var(--border);
@@ -645,6 +662,13 @@ input[type="checkbox"] {
   border-radius: 6px;
   background: var(--panel-2);
   font-size: 13px;
+  transition: background 100ms;
+}
+.digest-tasks li.clickable {
+  cursor: pointer;
+}
+.digest-tasks li.clickable:hover {
+  background: var(--accent-bg);
 }
 .digest-tasks li .prio {
   font-size: 10px;
